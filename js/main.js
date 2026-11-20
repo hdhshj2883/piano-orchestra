@@ -120,7 +120,7 @@ const meta = () => ({ title: S.piece.title, composer: S.piece.composer, arranger
 // —— 播放 ——
 async function ensureLoaded() {
   status('加载音色…');
-  await prepare(S.view, (p) => status(`加载音色 ${Math.round(p * 100)}%`));
+  await prepare(S.view, (p) => status(`加载音色 ${Math.round(p * 100)}%`), [44100, player.ensureCtx().sampleRate]);
   status('');
 }
 async function startPlay(from = 0, extraDest = null) {
@@ -155,7 +155,7 @@ function busy(btn, on, label) {
 }
 $('wavBtn').onclick = async () => {
   if (!S.A) return;
-  const b = $('wavBtn'); busy(b, true, '渲染中…');
+  const b = $('wavBtn'); busy(b, true, '渲染中…'); toast('正在用真实采样渲染整首乐曲，约需 1–2 分钟…', 6000);
   try {
     await ensureLoaded();
     const blob = await renderWav(S.view, S.bpm, S.A.total, S.mutes);

@@ -7,23 +7,23 @@ const FAM_COLOR = {
 
 // tr = 记谱音高 - 实际音高（半音）；tf = 调号五度圈偏移
 export const INSTR = {
-  flute:    { name: '长笛', en: 'Flute', gm: 'flute', prog: 73, fam: 'ww', range: [60, 96], clef: 'G', gain: 0.75, att: 0.06, rel: 0.25, sus: true, pan: -0.05 },
-  oboe:     { name: '双簧管', en: 'Oboe', gm: 'oboe', prog: 68, fam: 'ww', range: [58, 91], clef: 'G', gain: 0.65, att: 0.05, rel: 0.2, sus: true, pan: 0.05 },
-  clarinet: { name: '单簧管 (B♭)', en: 'Clarinet in B♭', gm: 'clarinet', prog: 71, fam: 'ww', range: [50, 89], clef: 'G', tr: 2, tf: 2, diat: -1, gain: 0.6, att: 0.06, rel: 0.25, sus: true, pan: -0.1 },
-  bassoon:  { name: '大管', en: 'Bassoon', gm: 'bassoon', prog: 70, fam: 'ww', range: [34, 72], clef: 'F', gain: 0.6, att: 0.05, rel: 0.25, sus: true, pan: 0.1 },
-  horn1:    { name: '圆号 I (F)', en: 'Horn in F I', gm: 'french_horn', prog: 60, fam: 'br', range: [41, 77], clef: 'G', tr: 7, tf: 1, diat: -4, gain: 0.5, att: 0.1, rel: 0.35, sus: true, pan: -0.35 },
-  horn2:    { name: '圆号 II (F)', en: 'Horn in F II', gm: 'french_horn', prog: 60, fam: 'br', range: [41, 74], clef: 'G', tr: 7, tf: 1, diat: -4, gain: 0.45, att: 0.1, rel: 0.35, sus: true, pan: -0.3 },
-  trumpet:  { name: '小号 (B♭)', en: 'Trumpet in B♭', gm: 'trumpet', prog: 56, fam: 'br', range: [55, 82], clef: 'G', tr: 2, tf: 2, diat: -1, gain: 0.45, att: 0.03, rel: 0.25, sus: true, pan: 0.25 },
-  trombone: { name: '长号', en: 'Trombone', gm: 'trombone', prog: 57, fam: 'br', range: [40, 72], clef: 'F', gain: 0.45, att: 0.05, rel: 0.3, sus: true, pan: 0.35 },
-  tuba:     { name: '大号', en: 'Tuba', gm: 'tuba', prog: 58, fam: 'br', range: [28, 58], clef: 'F', gain: 0.5, att: 0.05, rel: 0.3, sus: true, pan: 0.4 },
-  timpani:  { name: '定音鼓', en: 'Timpani', gm: 'timpani', prog: 47, fam: 'perc', range: [41, 57], clef: 'F', gain: 0.85, att: 0.002, rel: 1.2, pan: 0 },
-  harp:     { name: '竖琴', en: 'Harp', gm: 'orchestral_harp', prog: 46, fam: 'pl', range: [24, 103], staves: 2, gain: 0.7, att: 0.002, rel: 1.0, pan: -0.55 },
-  vln1:     { name: '第一小提琴', en: 'Violin I', gm: 'violin', prog: 40, fam: 'str', range: [55, 100], clef: 'G', gain: 0.6, att: 0.08, rel: 0.3, sus: true, pan: -0.5 },
-  vln2:     { name: '第二小提琴', en: 'Violin II', gm: 'violin', prog: 40, fam: 'str', range: [55, 96], clef: 'G', gain: 0.5, att: 0.06, rel: 0.25, sus: true, pan: -0.25 },
-  viola:    { name: '中提琴', en: 'Viola', gm: 'viola', prog: 41, fam: 'str', range: [48, 86], clef: 'C', gain: 0.55, att: 0.08, rel: 0.3, sus: true, pan: 0.15 },
-  cello:    { name: '大提琴', en: 'Violoncello', gm: 'cello', prog: 42, fam: 'str', range: [36, 76], clef: 'F', gain: 0.65, att: 0.08, rel: 0.3, sus: true, pan: 0.35 },
-  cbass:    { name: '低音提琴', en: 'Contrabass', gm: 'contrabass', prog: 43, fam: 'str', range: [28, 60], clef: 'F', tr: 12, octOnly: true, gain: 0.6, att: 0.08, rel: 0.3, sus: true, pan: 0.5 },
-  piano:    { name: '钢琴', en: 'Piano', gm: 'acoustic_grand_piano', prog: 0, fam: 'key', range: [21, 108], staves: 2, gain: 0.85, att: 0.002, rel: 0.5, pan: 0 },
+  flute:    { vs: 'fl', name: '长笛', en: 'Flute', gm: 'flute', prog: 73, fam: 'ww', range: [60, 96], clef: 'G', gain: 0.75, att: 0.06, rel: 0.25, sus: true, pan: -0.05 },
+  oboe:     { vs: 'ob', name: '双簧管', en: 'Oboe', gm: 'oboe', prog: 68, fam: 'ww', range: [58, 91], clef: 'G', gain: 0.65, att: 0.05, rel: 0.2, sus: true, pan: 0.05 },
+  clarinet: { vs: 'cl', name: '单簧管 (B♭)', en: 'Clarinet in B♭', gm: 'clarinet', prog: 71, fam: 'ww', range: [50, 89], clef: 'G', tr: 2, tf: 2, diat: -1, gain: 0.6, att: 0.06, rel: 0.25, sus: true, pan: -0.1 },
+  bassoon:  { vs: 'bn', name: '大管', en: 'Bassoon', gm: 'bassoon', prog: 70, fam: 'ww', range: [34, 72], clef: 'F', gain: 0.6, att: 0.05, rel: 0.25, sus: true, pan: 0.1 },
+  horn1:    { vs: 'hn', name: '圆号 I (F)', en: 'Horn in F I', gm: 'french_horn', prog: 60, fam: 'br', range: [41, 77], clef: 'G', tr: 7, tf: 1, diat: -4, gain: 0.5, att: 0.1, rel: 0.35, sus: true, pan: -0.35 },
+  horn2:    { vs: 'hn', name: '圆号 II (F)', en: 'Horn in F II', gm: 'french_horn', prog: 60, fam: 'br', range: [41, 74], clef: 'G', tr: 7, tf: 1, diat: -4, gain: 0.45, att: 0.1, rel: 0.35, sus: true, pan: -0.3 },
+  trumpet:  { vs: 'tp', name: '小号 (B♭)', en: 'Trumpet in B♭', gm: 'trumpet', prog: 56, fam: 'br', range: [55, 82], clef: 'G', tr: 2, tf: 2, diat: -1, gain: 0.45, att: 0.03, rel: 0.25, sus: true, pan: 0.25 },
+  trombone: { vs: 'tb', name: '长号', en: 'Trombone', gm: 'trombone', prog: 57, fam: 'br', range: [40, 72], clef: 'F', gain: 0.45, att: 0.05, rel: 0.3, sus: true, pan: 0.35 },
+  tuba:     { vs: 'tu', name: '大号', en: 'Tuba', gm: 'tuba', prog: 58, fam: 'br', range: [28, 58], clef: 'F', gain: 0.5, att: 0.05, rel: 0.3, sus: true, pan: 0.4 },
+  timpani:  { vs: 'timp', name: '定音鼓', en: 'Timpani', gm: 'timpani', prog: 47, fam: 'perc', range: [41, 57], clef: 'F', gain: 0.85, att: 0.002, rel: 1.2, pan: 0 },
+  harp:     { vs: 'harp', name: '竖琴', en: 'Harp', gm: 'orchestral_harp', prog: 46, fam: 'pl', range: [24, 103], staves: 2, gain: 0.7, att: 0.002, rel: 1.0, pan: -0.55 },
+  vln1:     { vs: 'vln', name: '第一小提琴', en: 'Violin I', gm: 'violin', prog: 40, fam: 'str', range: [55, 100], clef: 'G', gain: 0.6, att: 0.08, rel: 0.3, sus: true, pan: -0.5 },
+  vln2:     { vs: 'vln', name: '第二小提琴', en: 'Violin II', gm: 'violin', prog: 40, fam: 'str', range: [55, 96], clef: 'G', gain: 0.5, att: 0.06, rel: 0.25, sus: true, pan: -0.25 },
+  viola:    { vs: 'vla', name: '中提琴', en: 'Viola', gm: 'viola', prog: 41, fam: 'str', range: [48, 86], clef: 'C', gain: 0.55, att: 0.08, rel: 0.3, sus: true, pan: 0.15 },
+  cello:    { vs: 'vc', name: '大提琴', en: 'Violoncello', gm: 'cello', prog: 42, fam: 'str', range: [36, 76], clef: 'F', gain: 0.65, att: 0.08, rel: 0.3, sus: true, pan: 0.35 },
+  cbass:    { vs: 'cb', name: '低音提琴', en: 'Contrabass', gm: 'contrabass', prog: 43, fam: 'str', range: [28, 60], clef: 'F', tr: 12, octOnly: true, gain: 0.6, att: 0.08, rel: 0.3, sus: true, pan: 0.5 },
+  piano:    { vs: 'pno', name: '钢琴', en: 'Piano', gm: 'acoustic_grand_piano', prog: 0, fam: 'key', range: [21, 108], staves: 2, gain: 0.85, att: 0.002, rel: 0.5, pan: 0 },
   epiano:   { name: '电钢琴', en: 'Electric Piano', gm: 'electric_piano_1', prog: 4, fam: 'key', range: [28, 96], staves: 2, gain: 0.7, att: 0.003, rel: 0.4, pan: -0.2 },
   ebass:    { name: '电贝斯', en: 'Bass Guitar', gm: 'electric_bass_finger', prog: 33, fam: 'band', range: [28, 60], clef: 'F', tr: 12, octOnly: true, gain: 0.8, att: 0.005, rel: 0.12, pan: 0 },
   jguitar:  { name: '清音吉他', en: 'Clean Guitar', gm: 'electric_guitar_jazz', prog: 26, fam: 'gtr', range: [52, 84], clef: 'G', tr: 12, octOnly: true, gain: 0.7, att: 0.005, rel: 0.3, pan: 0.3 },
@@ -321,7 +321,9 @@ export function arrange(A, ensembleId) {
     let notes = [];
     for (const w of A.wins) {
       const lvl = A.levels[w.bar];
-      notes.push(...roleNotes(roles[lvl], w, A, lvl));
+      const rn = roleNotes(roles[lvl], w, A, lvl);
+      if (roles[lvl] && roles[lvl].startsWith('fig')) rn.forEach(n => { n.f = 1; });
+      notes.push(...rn);
     }
     if (!ins.drum) notes.forEach(n => { n.p = fitRange(n.p, ins.range); });
     // 结尾强化：最后一小节的长音

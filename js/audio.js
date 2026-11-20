@@ -27,12 +27,94 @@ function b64ToBuf(b64) {
   return u.buffer;
 }
 
+// —— 真实录音采样（VSCO-2 CE，CC0）——
+const VS_BASE = new URL('../samples/', import.meta.url).href;
+let manifestP = null;
+const vsBuf = {}; // inst -> Map(sampleMidi -> AudioBuffer)
+const vsLoading = {};
+function manifest() {
+  manifestP ||= fetch(VS_BASE + 'manifest.json').then(r => r.json());
+  return manifestP;
+}
+function nearest(list, p) {
+  let best = list[0];
+  for (const m of list) if (Math.abs(m - p) < Math.abs(best - p)) best = m;
+  return best;
+}
+async function loadVs(inst, sampleMidis) {
+  const store = (vsBuf[inst] ||= new Map());
+  await Promise.all(sampleMidis.map(m => {
+    const key = inst + ':' + m;
+    if (store.has(m)) return null;
+    vsLoading[key] ||= fetch(VS_BASE + inst + '/' + Math.round(m) + '.m4a')
+      .then(r => { if (!r.ok) throw new Error('采样下载失败 ' + key); return r.arrayBuffer(); })
+      .then(b => decodeCtx.decodeAudioData(b))
+      .then(buf => { store.set(m, buf); });
+    return vsLoading[key];
+  }));
+}
+// 找到某个音高对应的采样及播放速率
+function vsSample(part, p, short) {
+  const inst = short && part.vs === 'vln' && vsBuf.vlnspic ? 'vlnspic' : part.vs;
+  const store = vsBuf[inst];
+  if (!store || !store.size) return null;
+  const m = nearest([...store.keys()], p);
+  return { buf: store.get(m), rate: Math.pow(2, (p - m) / 12) };
+}
+
+// —— 音乐厅混响：频率相关衰减 + 早期反射 ——
+const irCache = {};
+async function hallIR(sr) {
+  if (irCache[sr]) return irCache[sr];
+  const sec = 3.4, len = Math.floor(sr * sec);
+  const oc = new OfflineAudioContext(2, len, sr);
+  const nb = oc.createBuffer(2, len, sr);
+  for (let c = 0; c < 2; c++) {
+    const d = nb.getChannelData(c);
+    for (let i = 0; i < len; i++) {
+      const t = i / sr;
+      const env = t < 0.022 ? 0 : Math.exp(-6.9 * (t - 0.022) / 2.3) * Math.min(1, (t - 0.022) / 0.03);
+      d[i] = (Math.random() * 2 - 1) * env * 0.6;
+    }
+    // 早期反射
+    [[0.011, 0.55], [0.019, 0.42], [0.027, 0.36], [0.041, 0.3], [0.053, 0.24], [0.067, 0.2], [0.083, 0.16]].forEach(([t, g], k) => {
+      const i = Math.floor((t + (c ? 0.0017 * (k % 3) : 0.0011 * (k % 2))) * sr);
+      d[i] += (k % 2 ? -g : g);
+    });
+  }
+  const src = oc.createBufferSource(); src.buffer = nb;
+  const lp = oc.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.5;
+  lp.frequency.setValueAtTime(9000, 0);
+  lp.frequency.exponentialRampToValueAtTime(2500, 0.6);
+  lp.frequency.exponentialRampToValueAtTime(700, sec);
+  const hp = oc.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
+  src.connect(lp).connect(hp).connect(oc.destination); src.start();
+  irCache[sr] = await oc.startRendering();
+  return irCache[sr];
+}
+
 // 加载编配中用到的所有音色与音高
-export async function prepare(arr, onProgress) {
+export async function prepare(arr, onProgress, sampleRates = [44100]) {
   decodeCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+  await Promise.all([...new Set([...sampleRates, decodeCtx.sampleRate])].map(hallIR));
+  const man = await manifest();
+  const vsJobs = {};
+  for (const part of arr.parts) {
+    if (!part.vs || !man[part.vs]) continue;
+    for (const n of part.notes) {
+      (vsJobs[part.vs] ||= new Set()).add(nearest(man[part.vs], n.p));
+      if (part.vs === 'vln' && man.vlnspic) (vsJobs.vlnspic ||= new Set()).add(nearest(man.vlnspic, n.p));
+    }
+  }
+  const vsList = Object.entries(vsJobs);
+  let vsDone = 0;
+  await Promise.all(vsList.map(async ([inst, set]) => {
+    await loadVs(inst, [...set]);
+    vsDone++; onProgress && onProgress(vsDone / (vsList.length + 1), inst);
+  }));
   const jobs = [];
   for (const part of arr.parts) {
-    if (part.drum) continue;
+    if (part.drum || part.vs) continue;
     const need = [...new Set(part.notes.map(n => n.p))];
     jobs.push({ gm: part.gm, need });
   }
@@ -86,8 +168,8 @@ export function buildGraph(ctx, arr, dests, mutes = {}) {
   const nParts = arr.parts.length;
   bus.gain.value = 1.6 / Math.sqrt(Math.max(1, nParts / 2));
   const dry = ctx.createGain(); dry.gain.value = 1;
-  const conv = ctx.createConvolver(); conv.buffer = makeImpulse(ctx);
-  const wet = ctx.createGain(); wet.gain.value = arr.reverb ?? 0.25;
+  const conv = ctx.createConvolver(); conv.buffer = irCache[ctx.sampleRate] || makeImpulse(ctx);
+  const wet = ctx.createGain(); wet.gain.value = (arr.reverb ?? 0.25) * 1.25;
   bus.connect(dry).connect(comp);
   bus.connect(conv).connect(wet).connect(comp);
   comp.connect(master);
@@ -130,22 +212,68 @@ function playDrum(ctx, out, p, t, v, srcs) {
 // 调度一个音符；长音用交叉淡入的分段循环来延长采样
 function playNote(ctx, part, out, n, t, spb, srcs) {
   if (part.drum) return playDrum(ctx, out, n.p, t, n.v, srcs);
-  const buf = buffers[part.gm] && buffers[part.gm].get(n.p);
-  if (!buf) return;
-  const dur = Math.max(0.05, n.d * spb);
-  const att = part.att ?? 0.01, rel = part.rel ?? 0.25;
-  const vol = Math.pow(n.v, 1.4);
+  let dur = Math.max(0.05, n.d * spb);
+  let buf, rate = 1, real = false;
+  if (part.vs) {
+    const smp = vsSample(part, n.p, dur < 0.3 && !n.m);
+    if (!smp) return;
+    buf = smp.buf; rate = smp.rate; real = true;
+  } else {
+    buf = buffers[part.gm] && buffers[part.gm].get(n.p);
+    if (!buf) return;
+  }
+  // 人性化：非音型声部的起音有轻微前后偏差，力度轻微浮动
+  const human = real && !n.f && part.id !== 'piano';
+  if (human) t += (Math.random() - 0.5) * 0.018;
+  let v = n.v * (1 + (Math.random() - 0.5) * (real ? 0.08 : 0));
+  const att = real ? (n.m && part.sus ? 0.12 : 0.012) : (part.att ?? 0.01);
+  const rel = real ? (part.sus ? 0.35 : part.rel ?? 0.6) : (part.rel ?? 0.25);
+  const vol = Math.pow(v, 1.4) * (real ? 0.9 : 1);
+  // 力度越弱音色越暗（真实乐器的弱奏特征）
+  let dest = out;
+  if (real && part.sus) {
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.3;
+    lp.frequency.value = 1100 + 15000 * v * v;
+    lp.connect(out); dest = lp;
+  }
+  let swell = real && part.sus && n.m && dur > 0.9; // 长音的自然起伏
+  const bufDur = buf.duration / rate;
   const seg = (start, offset, len, fadeIn, fadeOut, level) => {
-    const s = ctx.createBufferSource(); s.buffer = buf;
+    const s = ctx.createBufferSource(); s.buffer = buf; s.playbackRate.value = rate;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, start);
-    g.gain.linearRampToValueAtTime(level, start + fadeIn);
-    g.gain.setValueAtTime(level, start + Math.max(fadeIn, len));
+    if (swell) {
+      g.gain.linearRampToValueAtTime(level * 0.78, start + fadeIn);
+      g.gain.linearRampToValueAtTime(level, start + Math.max(fadeIn + 0.01, len * 0.45));
+      g.gain.linearRampToValueAtTime(level * 0.82, start + Math.max(fadeIn + 0.02, len));
+    } else {
+      g.gain.linearRampToValueAtTime(level, start + fadeIn);
+      g.gain.setValueAtTime(level, start + Math.max(fadeIn, len));
+    }
     g.gain.linearRampToValueAtTime(0, start + len + fadeOut);
-    s.connect(g).connect(out);
+    s.connect(g).connect(dest);
     s.start(start, offset); s.stop(start + len + fadeOut + 0.05);
     srcs.push(s);
   };
+  if (real) {
+    // 真实采样已带 0.7s 淡出尾部；长音用交叉淡入的分段延长
+    const maxLen = bufDur - 0.9;
+    if (!part.sus || dur + rel <= maxLen) {
+      const len = Math.min(dur, maxLen);
+      seg(t, 0, len, att, part.sus ? rel : Math.max(0.1, Math.min(rel, bufDur - len - 0.05)), vol);
+      return;
+    }
+    swell = false;
+    const X = 0.45, off = 1.0, segLen = Math.max(0.8, maxLen - off / rate - X);
+    let start = t, first = true, remain = dur;
+    while (remain > 0) {
+      const len = Math.min(remain, first ? maxLen - X : segLen);
+      const last = remain <= len + 1e-6;
+      seg(start, first ? 0 : off, len, first ? att : X, last ? rel : X, vol);
+      start += len; remain -= len; first = false;
+    }
+    return;
+  }
   const maxLen = buf.duration - 0.35;
   if (!part.sus || dur + rel <= maxLen) {
     const len = Math.min(dur, maxLen);

@@ -71,7 +71,8 @@ export function buildMusicXML(A, arr, meta) {
       const wp = part.drum ? n.p : n.p + (part.tr || 0);
       let s = Math.round(n.s * DIV), e = Math.round((n.s + n.d) * DIV);
       if (e <= s) e = s + 1;
-      const staff = staves === 2 ? (wp >= 60 ? 1 : 2) : 1;
+      // 双行谱：低于中央C，或是低音区的长音（钢琴左手持续音）放下行
+      const staff = staves === 2 ? ((wp < 60 || (n.d >= 1 && wp < 67)) ? 2 : 1) : 1;
       let first = true;
       while (s < e) {
         const be = (Math.floor(s / barU) + 1) * barU;
@@ -120,11 +121,10 @@ function measureXml(segs, barU, fifths, staff, staves, drum) {
   const staffTag = staves === 2 ? `<staff>${staff}</staff>` : '';
   if (!segs.length) return `<note><rest measure="yes"/><duration>${barU}</duration><voice>${voice}</voice>${staffTag}</note>`;
   const onsets = [...new Set(segs.map(g => g.s))].sort((a, b) => a - b);
-  let pos = 0, xml = '';
-  const rest = len => chunks(len).forEach(c => {
-    const [t, dot] = TYPES[c];
-    xml += `<note><rest/><duration>${c}</duration><voice>${voice}</voice><type>${t}</type>${dot ? '<dot/>' : ''}${staffTag}</note>`;
-  });
+  // 先生成“事件”列表（音符/休止符，含位置与时值），再计算符杠，最后输出
+  const items = [];
+  let pos = 0;
+  const rest = len => chunks(len).forEach(c => { items.push({ pos, dur: c, rest: true }); pos += c; });
   onsets.forEach((on, i) => {
     if (on < pos) return;
     if (on > pos) rest(on - pos);
@@ -132,10 +132,45 @@ function measureXml(segs, barU, fifths, staff, staves, drum) {
     const next = i + 1 < onsets.length ? onsets[i + 1] : barU;
     const end = Math.min(next, Math.min(...group.map(g => g.e)), barU);
     const cs = chunks(end - on);
-    // 去重同音
     const uniq = [...new Map(group.map(g => [g.p, g])).values()].sort((a, b) => a.p - b.p);
-    cs.forEach((c, ci) => {
-      const [t, dot] = TYPES[c];
+    cs.forEach((c, ci) => { items.push({ pos, dur: c, uniq, ci, nChunks: cs.length, end }); pos += c; });
+    pos = end;
+  });
+  if (pos < barU) rest(barU - pos);
+
+  // 符杠：同一拍内相邻的八分/十六分音符连起来
+  const beatU = (barU % 6 === 0 && barU % 4 !== 0) ? 6 : 4;
+  const beamable = it => !it.rest && it.dur < 4;
+  let k = 0;
+  while (k < items.length) {
+    if (!beamable(items[k])) { k++; continue; }
+    const beat = Math.floor(items[k].pos / beatU);
+    let j = k;
+    while (j + 1 < items.length && beamable(items[j + 1]) && Math.floor(items[j + 1].pos / beatU) === beat &&
+           items[j + 1].pos + items[j + 1].dur <= (beat + 1) * beatU) j++;
+    if (j > k) {
+      for (let x = k; x <= j; x++) {
+        const it = items[x];
+        it.beams = [x === k ? 'begin' : x === j ? 'end' : 'continue'];
+        if (it.dur === 1) {
+          const prev16 = x > k && items[x - 1].dur === 1, next16 = x < j && items[x + 1].dur === 1;
+          it.beams.push(prev16 && next16 ? 'continue' : prev16 ? 'end' : next16 ? 'begin' : x === k ? 'forward hook' : 'backward hook');
+        }
+      }
+    }
+    k = j + 1;
+  }
+
+  let xml = '';
+  items.forEach(it => {
+    const [t, dot] = TYPES[it.dur];
+    if (it.rest) {
+      xml += `<note><rest/><duration>${it.dur}</duration><voice>${voice}</voice><type>${t}</type>${dot ? '<dot/>' : ''}${staffTag}</note>`;
+      return;
+    }
+    const { uniq, ci, end } = it, c = it.dur, cs = { length: it.nChunks };
+    const beamXml = (it.beams || []).map((b, n) => `<beam number="${n + 1}">${b}</beam>`).join('');
+    {
       uniq.forEach((g, gi) => {
         const tieStop = ci > 0 || g.tieStop;
         const fullyHeld = g.e === end;
@@ -151,11 +186,9 @@ function measureXml(segs, barU, fifths, staff, staves, drum) {
         }
         const ties = (tieStop ? '<tie type="stop"/>' : '') + (tieStart ? '<tie type="start"/>' : '');
         const tied = (tieStop ? '<tied type="stop"/>' : '') + (tieStart ? '<tied type="start"/>' : '');
-        xml += `<note>${gi > 0 ? '<chord/>' : ''}${pitch}<duration>${c}</duration>${ties}<voice>${voice}</voice><type>${t}</type>${dot ? '<dot/>' : ''}${head}${staffTag}${tied ? `<notations>${tied}</notations>` : ''}</note>`;
+        xml += `<note>${gi > 0 ? '<chord/>' : ''}${pitch}<duration>${c}</duration>${ties}<voice>${voice}</voice><type>${t}</type>${dot ? '<dot/>' : ''}${head}${staffTag}${gi === 0 ? beamXml : ''}${tied ? `<notations>${tied}</notations>` : ''}</note>`;
       });
-    });
-    pos = end;
+    }
   });
-  if (pos < barU) rest(barU - pos);
   return xml;
 }

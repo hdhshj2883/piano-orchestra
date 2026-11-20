@@ -24,3 +24,7 @@
 4. 所有音符折叠进各乐器的实际音域
 
 纯静态网页，无需后端。音色来自 FluidR3 GM（gleitz/midi-js-soundfonts），乐谱渲染使用 OpenSheetMusicDisplay。
+
+## 音色来源
+
+管弦乐与钢琴使用 [VSCO-2 Community Edition](https://github.com/sgossner/VSCO-2-CE)（CC0 公有领域）的真实录音采样：弦乐声部、木管、铜管、定音鼓、竖琴与立式钢琴。采样已截取、归一化并转为 AAC，放在 `samples/`。
