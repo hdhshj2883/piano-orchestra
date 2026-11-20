@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>琴转交响 · 钢琴曲交响化</title>
+<meta name="description" content="把钢琴独奏曲自动配器成大编制交响乐团、小编制室内乐团或流行乐队，输出音频、总谱和视频。">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.2.1/build/opensheetmusicdisplay.min.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <h1>琴转交响</h1>
+    <p class="sub">把钢琴独奏曲自动配器成交响乐 —— 听音频、看总谱、导出视频</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card">
+    <h2><span class="num">1</span>选择钢琴曲</h2>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="builtin">内置曲目</button>
+      <button class="tab" data-tab="midi">MIDI</button>
+      <button class="tab" data-tab="xml">乐谱 (MusicXML)</button>
+      <button class="tab" data-tab="audio">录音 (AI 转写)</button>
+      <button class="tab" data-tab="pdf">PDF 乐谱</button>
+    </div>
+    <div class="panel active" data-panel="builtin">
+      <select id="builtinSel"></select>
+      <button id="loadBuiltin" class="btn">载入</button>
+    </div>
+    <div class="panel" data-panel="midi">
+      <label class="drop"><input type="file" id="midiFile" accept=".mid,.midi"><span>点击选择 .mid / .midi 文件</span></label>
+    </div>
+    <div class="panel" data-panel="xml">
+      <label class="drop"><input type="file" id="xmlFile" accept=".xml,.musicxml,.mxl"><span>点击选择 .musicxml / .xml / .mxl 文件</span></label>
+    </div>
+    <div class="panel" data-panel="audio">
+      <div class="row">
+        <label class="drop"><input type="file" id="audioFile" accept="audio/*"><span>点击选择钢琴录音（mp3 / wav / m4a，≤5 分钟）</span></label>
+        <label class="inline">录音速度 BPM <input type="number" id="audioBpm" value="90" min="30" max="220"></label>
+      </div>
+      <p class="hint">实验功能：用 Spotify basic-pitch 模型在浏览器里把录音转成音符，首次需下载约 20 MB 模型。干净的独奏录音效果最好。</p>
+    </div>
+    <div class="panel" data-panel="pdf">
+      <p>浏览器里无法可靠地直接识别 PDF 乐谱。请先把 PDF 转成 MusicXML，再到「乐谱」页上传：</p>
+      <ol>
+        <li><b>Audiveris</b>（免费开源光学乐谱识别）：打开 PDF → 识别 → 导出 <code>.mxl</code></li>
+        <li><b>MuseScore 4</b>：文件 → 导入 PDF（会通过 musescore.com 在线识别），然后导出 MusicXML</li>
+      </ol>
+      <p class="hint">识别后建议在 MuseScore 里快速检查一遍错音再上传。</p>
+    </div>
+    <div id="pieceInfo" class="info"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">2</span>选择编制</h2>
+    <div class="ens" id="ensList"></div>
+    <div class="row controls">
+      <label class="inline">速度 <input type="range" id="tempo" min="30" max="200" value="66"> <b id="tempoVal">66</b> BPM</label>
+    </div>
+    <div id="plan" class="plan"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">3</span>试听与动态总谱</h2>
+    <div class="stage"><canvas id="viz"></canvas></div>
+    <div class="row transport">
+      <button id="playBtn" class="btn primary">▶ 播放</button>
+      <button id="stopBtn" class="btn">■ 停止</button>
+      <button id="abBtn" class="btn" title="切换到钢琴原曲对比">对比钢琴原曲</button>
+      <input type="range" id="seek" min="0" max="100" value="0" step="0.25">
+      <span id="status" class="status"></span>
+    </div>
+    <details class="mixer"><summary>声部开关（调音台）</summary><div id="mixer"></div></details>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">4</span>导出</h2>
+    <div class="row exports">
+      <button id="wavBtn" class="btn">⬇ 音频 WAV</button>
+      <button id="videoBtn" class="btn">⏺ 录制视频</button>
+      <button id="xmlBtn" class="btn">⬇ 总谱 MusicXML</button>
+      <button id="midiBtn" class="btn">⬇ 多轨 MIDI</button>
+      <button id="pdfBtn" class="btn">🖨 总谱 PDF（打印）</button>
+    </div>
+    <p class="hint">视频以实时播放方式录制（时长 = 乐曲时长），录制时请保持此标签页在前台。MusicXML 可用 MuseScore / Sibelius / Dorico 打开继续编辑。</p>
+  </section>
+
+  <section class="card score-card">
+    <h2><span class="num">5</span>总谱 <small id="scoreNote">（移调乐器按记谱音高）</small></h2>
+    <div class="row"><label class="inline">缩放 <input type="range" id="zoom" min="0.3" max="1.2" step="0.05" value="0.6"></label></div>
+    <div id="score"><p class="hint">载入乐曲后自动生成…</p></div>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  音色：FluidR3 GM（gleitz/midi-js-soundfonts）· 乐谱渲染：OpenSheetMusicDisplay · 内置曲目为公有领域作品
+</footer>
+
+<div id="toast" class="toast"></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
